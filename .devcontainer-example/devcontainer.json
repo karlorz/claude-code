@@ -52,6 +52,6 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postStartCommand": "/workplace/.devcontainer/postStartCommand.sh",
+  "postStartCommand": "/tmp/postStartCommand.sh",
   "waitFor": "postStartCommand"
 }
