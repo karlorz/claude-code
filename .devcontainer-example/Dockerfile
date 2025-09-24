@@ -76,6 +76,7 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
   -a "source /usr/share/doc/fzf/examples/completion.zsh" \
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
+  -a "cc () {claude --dangerously-skip-permissions}" \
   -x
 
 # Install Claude
@@ -91,5 +92,6 @@ COPY init-firewall.sh /usr/local/bin/
 USER root
 RUN chmod +x /usr/local/bin/init-firewall.sh && \
   echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
-  chmod 0440 /etc/sudoers.d/node-firewall
+  echo "node ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/node-passwordless && \
+  chmod 0440 /etc/sudoers.d/node-firewall /etc/sudoers.d/node-passwordless
 USER node
