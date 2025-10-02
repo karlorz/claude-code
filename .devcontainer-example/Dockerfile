@@ -1,9 +1,19 @@
-FROM node:20
+# see all versions at https://hub.docker.com/r/oven/bun/tags
+FROM oven/bun:1
 
 ARG TZ
 ENV TZ="$TZ"
 
 ARG CLAUDE_CODE_VERSION=latest
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  wget \
+  curl \
+  ca-certificates && \
+  update-ca-certificates
+
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x -o nodesource_setup.sh \
+  && bash nodesource_setup.sh
 
 # Install basic development tools and iptables/ipset
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,13 +35,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   jq \
   nano \
   vim \
+  nodejs \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Ensure default node user has access to /usr/local/share
+# Ensure default bun user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
-  chown -R node:node /usr/local/share
+  chown -R bun:bun /usr/local/share
 
-ARG USERNAME=node
+ARG USERNAME=bun
 
 # Persist bash history.
 RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
@@ -43,19 +54,21 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 ENV DEVCONTAINER=true
 
 # Create workspace and config directories and set permissions
-RUN mkdir -p /workspace /home/node/.claude && \
-  chown -R node:node /workspace /home/node/.claude
+RUN mkdir -p /workspace /home/bun/.claude && \
+  chown -R bun:bun /workspace /home/bun/.claude
 
 WORKDIR /workspace
 
 ARG GIT_DELTA_VERSION=0.18.2
-RUN ARCH=$(dpkg --print-architecture) && \
+RUN apt-get update && \
+  ARCH=$(dpkg --print-architecture) && \
   wget "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
-  rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
+  rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
+  apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set up non-root user
-USER node
+USER bun
 
 # Install global packages
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
@@ -69,7 +82,7 @@ ENV EDITOR=nano
 ENV VISUAL=nano
 
 # Default powerline10k theme
-ARG ZSH_IN_DOCKER_VERSION=1.2.0
+ARG ZSH_IN_DOCKER_VERSION=1.2.1
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
   -p git \
   -p fzf \
@@ -77,7 +90,9 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "source /usr/share/doc/fzf/examples/completion.zsh" \
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
   -a "cc () {claude --dangerously-skip-permissions}" \
-  -x
+  -x && \
+  test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" && \
+  echo "✓ Oh My Zsh with powerlevel10k installation completed for user: $(whoami)"
 
 # Install Claude
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
@@ -85,13 +100,13 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 COPY postStartCommand.sh /tmp/
 USER root
 RUN chmod +x /tmp/postStartCommand.sh
-USER node
+USER bun
 
 # Copy and set up firewall script
 COPY init-firewall.sh /usr/local/bin/
 USER root
 RUN chmod +x /usr/local/bin/init-firewall.sh && \
-  echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
-  echo "node ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/node-passwordless && \
-  chmod 0440 /etc/sudoers.d/node-firewall /etc/sudoers.d/node-passwordless
-USER node
+  echo "bun ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/bun-firewall && \
+  echo "bun ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/bun-passwordless && \
+  chmod 0440 /etc/sudoers.d/bun-firewall /etc/sudoers.d/bun-passwordless
+USER bun
